@@ -135,8 +135,11 @@ nameInput.addEventListener("input", () => updateEnrollButtonState());
 
 enrollBtn.addEventListener("click", async () => {
   if (enrollBtn.disabled) return;
+  const originalLabel = enrollBtn.textContent;
+  enrollBtn.disabled = true;
+  enrollBtn.textContent = "Uploading…";
   try {
-    setStatus("Enrolling your profile…", "warning");
+    setStatus("Uploading securely to Esade Cloud…", "warning");
     const blob = latestSnapshotBlob || (await captureFrameBlob());
     const formData = new FormData();
     formData.append("name", nameInput.value.trim());
@@ -152,11 +155,14 @@ enrollBtn.addEventListener("click", async () => {
     const payload = await response.json();
     nameInput.value = "";
     updateEnrollButtonState();
-    setStatus(payload.message || "Enrollment complete!", "success");
+    setStatus(payload.message || "Enrollment stored in the cloud!", "success");
     renderDetections([]); // clear boxes to avoid stale unknown overlay
   } catch (error) {
     console.error(error);
     setStatus(error.message, "warning");
+  } finally {
+    enrollBtn.textContent = originalLabel;
+    updateEnrollButtonState();
   }
 });
 

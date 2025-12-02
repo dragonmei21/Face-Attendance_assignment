@@ -1,56 +1,78 @@
 from __future__ import annotations
 
-import csv
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 from typing import Dict, List, Optional
+
+import boto3
+from botocore.exceptions import ClientError
+
+from aws.config import ATTENDANCE_TABLE, get_boto3_session_kwargs
 
 
 class AttendanceLogger:
-    def __init__(self, storage_type: str = "csv", storage_path: str = "data/attendance.csv") -> None:
-        if storage_type != "csv":
-            raise ValueError("Only CSV storage is supported in Phase 1.")
-        self.storage_path = Path(storage_path)
-        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.storage_path.exists():
-            self.storage_path.write_text("timestamp,user_id,source\n")
+    """
+    Stores attendance events inside the DynamoDB Attendance table.
+    session_id is derived from the current UTC date so we keep at most one
+    entry per user per day (similar to the former duplicate-prevention logic).
+    """
+
+    def __init__(self) -> None:
+        session_kwargs = get_boto3_session_kwargs()
+        dynamodb = boto3.resource("dynamodb", **session_kwargs)
+        self.table = dynamodb.Table(ATTENDANCE_TABLE)
 
     def log(self, user_id: str, source: str = "camera") -> bool:
-        timestamp = datetime.utcnow().isoformat()
-        if self.is_duplicate(user_id):
-            return False
-        with self.storage_path.open("a", newline="") as fh:
-            writer = csv.writer(fh)
-            writer.writerow([timestamp, user_id, source])
-        return True
-
-    def is_duplicate(self, user_id: str, interval_minutes: int = 5) -> bool:
-        last_event = self.get_last_event(user_id)
-        if not last_event:
-            return False
-        last_time = datetime.fromisoformat(last_event["timestamp"])
-        return datetime.utcnow() - last_time < timedelta(minutes=interval_minutes)
+        timestamp = datetime.utcnow()
+        session_id = timestamp.strftime("%Y%m%d")
+        iso_timestamp = timestamp.isoformat()
+        try:
+            self.table.put_item(
+                Item={
+                    "session_id": session_id,
+                    "face_id": user_id,
+                    "timestamp": iso_timestamp,
+                    "source": source,
+                },
+                ConditionExpression="attribute_not_exists(face_id)",
+            )
+            return True
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                # Already logged for this session (day)
+                return False
+            raise
 
     def get_last_event(self, user_id: str) -> Optional[Dict]:
         records = self.get_records({"user_id": user_id})
-        return records[-1] if records else None
+        if not records:
+            return None
+        return max(records, key=lambda row: row["timestamp"])
 
     def get_records(self, filters: Optional[Dict] = None) -> List[Dict]:
         filters = filters or {}
-        rows: List[Dict] = []
-        with self.storage_path.open("r", newline="") as fh:
-            reader = csv.DictReader(fh)
-            for row in reader:
-                user = row.get("user_id")
-                if not user:
-                    continue
-                if filters.get("user_id") and user != filters["user_id"]:
-                    continue
-                if filters.get("start_date"):
-                    if row["timestamp"] < filters["start_date"]:
-                        continue
-                if filters.get("end_date"):
-                    if row["timestamp"] > filters["end_date"]:
-                        continue
-                rows.append(row)
-        return rows
+        items: List[Dict] = []
+        response = self.table.scan()
+        items.extend(response.get("Items", []))
+        while "LastEvaluatedKey" in response:
+            response = self.table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
+            items.extend(response.get("Items", []))
+
+        def _match(item: Dict) -> bool:
+            if filters.get("user_id") and item.get("face_id") != filters["user_id"]:
+                return False
+            if filters.get("start_date") and item.get("timestamp", "") < filters["start_date"]:
+                return False
+            if filters.get("end_date") and item.get("timestamp", "") > filters["end_date"]:
+                return False
+            return True
+
+        return [
+            {
+                "timestamp": item.get("timestamp"),
+                "user_id": item.get("face_id"),
+                "source": item.get("source"),
+                "session_id": item.get("session_id"),
+            }
+            for item in items
+            if _match(item)
+        ]

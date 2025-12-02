@@ -11,7 +11,6 @@ DATA_USERS_DIR.mkdir(parents=True, exist_ok=True)
 system = ClassAttendanceSystem(
     users_dir=str(DATA_USERS_DIR),
     embeddings_file="data/known_faces.pkl",
-    logs_file="data/attendance.csv",
     threshold=0.5,
 )
 
