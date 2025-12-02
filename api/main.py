@@ -2,16 +2,21 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import os
 
 import cv2
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
 
 from .context import system, startup_time
 from .models.schemas import HealthResponse
 from .routes import register, recognize, logs, users
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(
     title="Face Attendance API",
@@ -25,6 +30,31 @@ INDEX_FILE = UI_ROOT / "index.html"
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Initialize system with storage backend based on environment variable
+storage_type = os.getenv("STORAGE_TYPE", "csv")
+dynamodb_table = os.getenv("DYNAMODB_TABLE_NAME", "attendance_records")
+dynamodb_region = os.getenv("DYNAMODB_REGION", "us-east-1")
+
+if storage_type == "dynamodb":
+    system = ClassAttendanceSystem(
+        users_dir="data/users",
+        embeddings_file="data/known_faces.pkl",
+        threshold=0.5,
+        storage_type="dynamodb",
+        dynamodb_table=dynamodb_table,
+        dynamodb_region=dynamodb_region,
+    )
+else:
+    system = ClassAttendanceSystem(
+        users_dir="data/users",
+        embeddings_file="data/known_faces.pkl",
+        logs_file="data/attendance.csv",
+        threshold=0.5,
+        storage_type="csv",
+    )
+
+startup_time = datetime.utcnow()
 
 
 @app.on_event("startup")
