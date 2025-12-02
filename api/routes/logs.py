@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Query, HTTPException
 
-from api.main import system
+from api.context import system
 from api.models.schemas import AttendanceResponse, AttendanceRecord
 
 router = APIRouter()

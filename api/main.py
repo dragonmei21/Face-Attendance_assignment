@@ -9,7 +9,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from core.system import ClassAttendanceSystem
+from .context import system, startup_time
 from .models.schemas import HealthResponse
 from .routes import register, recognize, logs, users
 
@@ -25,15 +25,6 @@ INDEX_FILE = UI_ROOT / "index.html"
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-system = ClassAttendanceSystem(
-    users_dir="data/users",
-    embeddings_file="data/known_faces.pkl",
-    logs_file="data/attendance.csv",
-    threshold=0.5,
-)
-
-startup_time = datetime.utcnow()
 
 
 @app.on_event("startup")

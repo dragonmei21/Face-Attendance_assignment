@@ -3,16 +3,11 @@ from __future__ import annotations
 
 import shutil
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
-from api.main import system, DATA_USERS_DIR  # or adjust import if needed
+from api.context import system, DATA_USERS_DIR
 from api.models.schemas import RegisterResponse
-
-# If DATA_USERS_DIR isn't in main yet, define here:
-DATA_USERS_DIR = Path("data/users")
-DATA_USERS_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter()
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
-from api.main import system
+from api.context import system
 from api.models.schemas import RecognizeResponse, RecognizeResult
 
 router = APIRouter()
