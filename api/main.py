@@ -1,39 +1,83 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+# api/main.py
+from __future__ import annotations
+
+from datetime import datetime
 from pathlib import Path
-import uuid
-import shutil
 
-from face_attendance.class_attendance_system import ClassAttendanceSystem
+from fastapi import FastAPI
 
-app = FastAPI()
+from core.system import ClassAttendanceSystem
+from .models.schemas import HealthResponse
+from .routes import register, recognize, logs, users
 
+app = FastAPI(
+    title="Face Attendance API",
+    version="1.0.0",
+    description="API layer on top of the local face attendance system.",
+)
+
+# Global system instance
 system = ClassAttendanceSystem(
     users_dir="data/users",
     embeddings_file="data/known_faces.pkl",
     logs_file="data/attendance.csv",
-    threshold=0.6
+    threshold=0.6,
 )
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+startup_time = datetime.utcnow()
 
-@app.post("/recognize")
-async def recognize(image: UploadFile = File(...)):
-    ext = image.filename.split(".")[-1].lower()
-    if ext not in {"jpg", "jpeg", "png"}:
-        raise HTTPException(status_code=400, detail="Invalid image format")
 
-    temp_path = Path(f"/tmp/{uuid.uuid4()}.{ext}")
-    with temp_path.open("wb") as f:
-        shutil.copyfileobj(image.file, f)
-
+@app.on_event("startup")
+async def on_startup():
+    """
+    Optionally try to load embeddings on startup.
+    If they don't exist yet, it's fine – they will be built 
+    on /register_face.
+    """
     try:
-        results = system.recognize(str(temp_path))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        temp_path.unlink(missing_ok=True)
+        system._ensure_recognizer()
+    except Exception:
+        # No embeddings yet, ignore
+        pass
 
-    return {"results": results}
 
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    """
+    Return system status and uptime, and whether embeddings are loaded.
+    """
+    now = datetime.utcnow()
+    uptime = (now - startup_time).total_seconds()
+
+    embeddings_loaded = system.recognizer is not None
+    known_users = len(system.recognizer.known_ids) if embeddings_loaded else 0
+
+    return HealthResponse(
+        status="ok",
+        uptime_seconds=uptime,
+        embeddings_loaded=embeddings_loaded,
+        known_users=known_users,
+    )
+
+
+# Include routers from routes package
+app.include_router(
+    register.router,
+    prefix="",
+    tags=["register"],
+)
+app.include_router(
+    recognize.router,
+    prefix="",
+    tags=["recognize"],
+)
+app.include_router(
+    logs.router,
+    prefix="",
+    tags=["attendance"],
+)
+app.include_router(
+    users.router,
+    prefix="",
+    tags=["users"],
+)
