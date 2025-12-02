@@ -8,7 +8,7 @@ import numpy as np
 
 
 class FaceRecognizer:
-    def __init__(self, embeddings: Dict[str, List[float]], threshold: float = 0.6) -> None:
+    def __init__(self, embeddings: Dict[str, List[float]], threshold: float = 0.5) -> None:
         self.threshold = threshold
         self.known_ids = list(embeddings.keys())
         self.known_vectors = np.array(list(embeddings.values()))

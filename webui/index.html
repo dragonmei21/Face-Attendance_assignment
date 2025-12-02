@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Esade Attendance Kiosk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <div class="hero__branding">
+          <img src="/static/esade-logo.png" alt="Esade logo" class="hero__logo" />
+          <div class="hero__text">
+            <p class="hero__eyebrow">AI-powered attendance</p>
+            <h1 class="hero__title">Welcome to Esade</h1>
+          </div>
+        </div>
+        <p class="hero__subtitle">Stand in front of the camera to check in instantly.</p>
+      </header>
+
+      <main class="content">
+        <section class="panel panel--camera">
+          <div class="camera-frame">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="overlay"></canvas>
+            <div class="status-chip" id="statusChip">Initializing camera…</div>
+            <div class="countdown-chip" id="countdownChip" hidden></div>
+          </div>
+        </section>
+
+        <section class="panel panel--form">
+          <div class="form-copy">
+            <h2>Not in the system yet?</h2>
+            <p class="muted">
+              Hold still inside the frame. Once we capture a clear image you can add your name and we
+              will enroll you automatically.
+            </p>
+          </div>
+          <label for="visitorName" class="input-label">Your full name</label>
+          <input
+            id="visitorName"
+            class="name-input"
+            type="text"
+            placeholder="Type your name"
+            autocomplete="off"
+          />
+          <button id="enrollBtn" class="primary-btn" disabled>Save my profile</button>
+          <p class="hint">The field shows a white underline inspired by the Esade brand system.</p>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>
+
