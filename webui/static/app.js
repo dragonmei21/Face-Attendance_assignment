@@ -286,34 +286,40 @@ async function logCloudComputingAttendance(userId) {
 }
 
 // Download button handler
-downloadBtn.addEventListener("click", async () => {
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
-  const url = `/download/cloud-computing?session_date=${today}`;
-  
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to download: ${response.statusText}`);
+if (downloadBtn) {
+  downloadBtn.addEventListener("click", async () => {
+    console.log("Download button clicked");
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+    const url = `/download/cloud-computing?session_date=${today}`;
+    
+    try {
+      setStatus("Downloading attendance...", "warning");
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `CloudComputing_Attendance_${today}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      setStatus("✓ Attendance downloaded", "success");
+      setTimeout(() => setStatus("Camera ready — please center yourself", "success"), 2000);
+    } catch (err) {
+      console.error("Download failed:", err);
+      setStatus("✗ Download failed: " + err.message, "warning");
+      setTimeout(() => setStatus("Camera ready — please center yourself", "success"), 3000);
     }
-    
-    const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = `CloudComputing_Attendance_${today}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(downloadUrl);
-    
-    setStatus("✓ Attendance downloaded", "success");
-    setTimeout(() => setStatus("Ready", "neutral"), 2000);
-  } catch (err) {
-    console.error("Download failed:", err);
-    setStatus("✗ Download failed", "warning");
-    setTimeout(() => setStatus("Ready", "neutral"), 2000);
-  }
-});
+  });
+} else {
+  console.error("downloadBtn element not found!");
+}
 
 initCamera();
 

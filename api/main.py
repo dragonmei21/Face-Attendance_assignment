@@ -118,9 +118,10 @@ async def enroll(name: str = Form(...), image: UploadFile = File(...)):
 async def download_cloud_computing_csv(session_date: Optional[str] = Query(None, description="Session date in YYYYMMDD format")):
     """
     Export Cloud Computing attendance for a given date (YYYYMMDD) or all sessions.
+    Only returns records logged via the Lambda (with course_name set).
     Returns a CSV file with attendance records.
     """
-    # Build filters
+    # Build filters - only Cloud Computing course attendance
     filters = {"course_name": "Cloud Computing"}
     if session_date:
         filters["session_id"] = session_date
@@ -137,19 +138,16 @@ async def download_cloud_computing_csv(session_date: Optional[str] = Query(None,
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
     
-    # Filter out None values and write rows
     for record in records:
-        # Only include if it has course_name (course-specific attendance)
-        if record.get("course_name"):
-            writer.writerow({
-                "session_id": record.get("session_id", ""),
-                "face_id": record.get("user_id", ""),
-                "timestamp": record.get("timestamp", ""),
-                "source": record.get("source", ""),
-                "course_name": record.get("course_name", ""),
-                "session_start": record.get("session_start", ""),
-                "session_end": record.get("session_end", ""),
-            })
+        writer.writerow({
+            "session_id": record.get("session_id", ""),
+            "face_id": record.get("user_id", ""),
+            "timestamp": record.get("timestamp", ""),
+            "source": record.get("source", ""),
+            "course_name": record.get("course_name", ""),
+            "session_start": record.get("session_start", ""),
+            "session_end": record.get("session_end", ""),
+        })
     
     output.seek(0)
     filename = f"CloudComputing_Attendance_{session_date or 'all'}.csv"
