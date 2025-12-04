@@ -263,14 +263,8 @@ function getGray(data, width, x, y) {
 
 // Lambda function call for Cloud Computing course attendance
 async function logCloudComputingAttendance(userId) {
-  // Replace with your actual Lambda API Gateway endpoint
-  const LAMBDA_ENDPOINT = "YOUR_LAMBDA_API_GATEWAY_URL_HERE";
-  
-  // If no endpoint configured, skip
-  if (LAMBDA_ENDPOINT === "YOUR_LAMBDA_API_GATEWAY_URL_HERE") {
-    console.log("Lambda endpoint not configured yet");
-    return;
-  }
+  // Lambda API Gateway endpoint for Cloud Computing course time-gated attendance
+  const LAMBDA_ENDPOINT = "https://8gabwdm8ta.execute-api.eu-north-1.amazonaws.com/prod/CloudComputingAttendanceGate";
   
   try {
     const response = await fetch(LAMBDA_ENDPOINT, {
