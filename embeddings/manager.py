@@ -62,8 +62,13 @@ class EmbeddingManager:
         items = self._scan_faces_table()
         embeddings: Dict[str, List[float]] = {}
         for item in items:
-            face_id = item["face_id"]
-            vector = [float(value) for value in item["embedding"]]
+            face_id = item.get("face_id")
+            embedding_data = item.get("embedding")
+            # Skip items that don't have proper embedding data
+            if not face_id or not embedding_data:
+                print(f"[WARNING] Skipping item without embedding: {face_id}")
+                continue
+            vector = [float(value) for value in embedding_data]
             embeddings[face_id] = vector
         return embeddings
 
