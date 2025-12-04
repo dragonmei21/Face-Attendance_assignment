@@ -13,7 +13,7 @@ from botocore.exceptions import ClientError
 
 def create_attendance_table(
     table_name: str = "attendance_records",
-    region: str = "us-east-1",
+    region: str = "eu-north-1",
 ) -> dict:
     """
     Create the DynamoDB table for attendance records if it doesn't exist.
