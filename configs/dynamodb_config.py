@@ -112,7 +112,7 @@ def delete_attendance_table(
 
 def get_table_info(
     table_name: str = "attendance_records",
-    region: str = "us-east-1",
+    region: str = "eu-north-1",
 ) -> dict:
     """
     Get information about the DynamoDB table.
