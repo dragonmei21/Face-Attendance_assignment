@@ -4,15 +4,21 @@ const statusChip = document.getElementById("statusChip");
 const countdownChip = document.getElementById("countdownChip");
 const nameInput = document.getElementById("visitorName");
 const enrollBtn = document.getElementById("enrollBtn");
+const downloadBtn = document.getElementById("downloadBtn");
 
 const captureCanvas = document.createElement("canvas");
 const captureCtx = captureCanvas.getContext("2d");
 const overlayCtx = overlay.getContext("2d");
 
+const BLUR_THRESHOLD = 250;
+const HOLD_STILL_SECONDS = 3;
+
 let latestSnapshotBlob = null;
 let recognitionInterval = null;
 let isRecognizing = false;
 let lastResults = [];
+let lastSharpness = 0;
+let unknownHoldStart = null;
 
 async function initCamera() {
   try {
@@ -53,21 +59,31 @@ function startRecognitionLoop() {
   recognizeFrame(); // kick off immediately
 }
 
-async function captureFrameBlob() {
+async function captureFrame() {
   if (!videoEl.videoWidth || !videoEl.videoHeight) {
     throw new Error("Camera not ready");
   }
   captureCtx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
-  return new Promise((resolve) => captureCanvas.toBlob(resolve, "image/jpeg", 0.92));
+  const sharpness = measureSharpness(captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height));
+  lastSharpness = sharpness;
+  return new Promise((resolve) =>
+    captureCanvas.toBlob((blob) => resolve({ blob, sharpness }), "image/jpeg", 0.92)
+  );
 }
 
 async function recognizeFrame() {
   if (isRecognizing) return;
   try {
     isRecognizing = true;
-    const blob = await captureFrameBlob();
+    const { blob, sharpness } = await captureFrame();
     if (!blob) {
       throw new Error("Unable to capture frame");
+    }
+    if (sharpness < BLUR_THRESHOLD) {
+      lastResults = [];
+      renderDetections([]);
+      showBlurWarning(sharpness);
+      return;
     }
     latestSnapshotBlob = blob;
     const formData = new FormData();
@@ -112,13 +128,34 @@ function renderDetections(results) {
 function updateUIState(payload) {
   const known = lastResults.filter((result) => result.user_id !== "Unknown");
   const unknown = lastResults.some((result) => result.user_id === "Unknown");
+  const now = performance.now();
 
   if (known.length) {
     const names = known.map((face) => face.user_id).join(", ");
-    setStatus(`Welcome back, ${names}!`, "success");
+    unknownHoldStart = null;
+    hideCountdown();
+    setStatus(`RECOGNIZED — welcome back, ${names}!`, "success");
+    
+    // Log to Cloud Computing course (Lambda will check time window)
+    known.forEach((face) => {
+      logCloudComputingAttendance(face.user_id);
+    });
   } else if (unknown) {
-    setStatus("Not recognized yet — enter your name below.", "warning");
+    if (!unknownHoldStart) {
+      unknownHoldStart = now;
+    }
+    const elapsed = (now - unknownHoldStart) / 1000;
+    const remaining = Math.max(0, HOLD_STILL_SECONDS - elapsed);
+    if (remaining > 0) {
+      showCountdown(`Hold still ${remaining.toFixed(1)}s`);
+      setStatus(`HOLD STILL ${remaining.toFixed(1)}s`, "warning");
+    } else {
+      showCountdown("Captured — enter your name");
+      setStatus("Unknown face captured — enter your name below.", "warning");
+    }
   } else if (lastResults.length === 0) {
+    unknownHoldStart = null;
+    hideCountdown();
     setStatus("Step closer and hold still for the camera.", "warning");
   }
 
@@ -140,7 +177,7 @@ enrollBtn.addEventListener("click", async () => {
   enrollBtn.textContent = "Uploading…";
   try {
     setStatus("Uploading securely to Esade Cloud…", "warning");
-    const blob = latestSnapshotBlob || (await captureFrameBlob());
+    const blob = latestSnapshotBlob || (await captureFrame()).blob;
     const formData = new FormData();
     formData.append("name", nameInput.value.trim());
     formData.append("image", blob, "enroll.jpg");
@@ -172,6 +209,117 @@ function setStatus(message, state = "neutral") {
   if (state === "success") statusChip.classList.add("status-chip--success");
   if (state === "warning") statusChip.classList.add("status-chip--warning");
 }
+
+function showCountdown(text) {
+  countdownChip.hidden = false;
+  countdownChip.textContent = text;
+}
+
+function hideCountdown() {
+  countdownChip.hidden = true;
+  countdownChip.textContent = "";
+}
+
+function showBlurWarning(sharpness) {
+  setStatus(
+    `DO NOT MOVE MUCH • sharpness ${Math.round(sharpness)}/${BLUR_THRESHOLD}`,
+    "warning"
+  );
+  hideCountdown();
+}
+
+function measureSharpness(imageData) {
+  const { data, width, height } = imageData;
+  const step = 6;
+  let sum = 0;
+  let count = 0;
+  for (let y = step; y < height - step; y += step) {
+    for (let x = step; x < width - step; x += step) {
+      const lap = laplacianAt(data, width, x, y);
+      sum += lap * lap;
+      count += 1;
+    }
+  }
+  if (!count) return 0;
+  return sum / count;
+}
+
+function laplacianAt(data, width, x, y) {
+  const center = getGray(data, width, x, y);
+  const left = getGray(data, width, x - 1, y);
+  const right = getGray(data, width, x + 1, y);
+  const up = getGray(data, width, x, y - 1);
+  const down = getGray(data, width, x, y + 1);
+  return left + right + up + down - 4 * center;
+}
+
+function getGray(data, width, x, y) {
+  const idx = (y * width + x) * 4;
+  const r = data[idx];
+  const g = data[idx + 1];
+  const b = data[idx + 2];
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+// Lambda function call for Cloud Computing course attendance
+async function logCloudComputingAttendance(userId) {
+  // Replace with your actual Lambda API Gateway endpoint
+  const LAMBDA_ENDPOINT = "YOUR_LAMBDA_API_GATEWAY_URL_HERE";
+  
+  // If no endpoint configured, skip
+  if (LAMBDA_ENDPOINT === "YOUR_LAMBDA_API_GATEWAY_URL_HERE") {
+    console.log("Lambda endpoint not configured yet");
+    return;
+  }
+  
+  try {
+    const response = await fetch(LAMBDA_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ face_id: userId, source: "web-ui" })
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log("✓ Cloud Computing attendance logged:", result.message);
+    } else {
+      console.warn("⚠ Lambda attendance:", result.error || result.message);
+    }
+  } catch (err) {
+    console.error("✗ Lambda attendance failed:", err);
+  }
+}
+
+// Download button handler
+downloadBtn.addEventListener("click", async () => {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+  const url = `/download/cloud-computing?session_date=${today}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to download: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `CloudComputing_Attendance_${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+    
+    setStatus("✓ Attendance downloaded", "success");
+    setTimeout(() => setStatus("Ready", "neutral"), 2000);
+  } catch (err) {
+    console.error("Download failed:", err);
+    setStatus("✗ Download failed", "warning");
+    setTimeout(() => setStatus("Ready", "neutral"), 2000);
+  }
+});
 
 initCamera();
 

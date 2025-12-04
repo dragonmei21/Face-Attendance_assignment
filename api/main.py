@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Query
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .context import system, startup_time
@@ -109,6 +112,54 @@ async def enroll(name: str = Form(...), image: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(exc))
 
     return {"status": "ok", "message": f"Enrolled {clean_name}"}
+
+
+@app.get("/download/cloud-computing")
+async def download_cloud_computing_csv(session_date: Optional[str] = Query(None, description="Session date in YYYYMMDD format")):
+    """
+    Export Cloud Computing attendance for a given date (YYYYMMDD) or all sessions.
+    Returns a CSV file with attendance records.
+    """
+    # Build filters
+    filters = {"course_name": "Cloud Computing"}
+    if session_date:
+        filters["session_id"] = session_date
+    
+    # Get records from DynamoDB
+    try:
+        records = system.logger.get_records(filters)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch records: {str(exc)}")
+    
+    # Build CSV in memory
+    output = io.StringIO()
+    fieldnames = ["session_id", "face_id", "timestamp", "source", "course_name", "session_start", "session_end"]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    
+    # Filter out None values and write rows
+    for record in records:
+        # Only include if it has course_name (course-specific attendance)
+        if record.get("course_name"):
+            writer.writerow({
+                "session_id": record.get("session_id", ""),
+                "face_id": record.get("user_id", ""),
+                "timestamp": record.get("timestamp", ""),
+                "source": record.get("source", ""),
+                "course_name": record.get("course_name", ""),
+                "session_start": record.get("session_start", ""),
+                "session_end": record.get("session_end", ""),
+            })
+    
+    output.seek(0)
+    filename = f"CloudComputing_Attendance_{session_date or 'all'}.csv"
+    
+    # Return as streaming response
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 def _decode_image(data: bytes):

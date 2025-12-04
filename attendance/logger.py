@@ -60,6 +60,10 @@ class AttendanceLogger:
         def _match(item: Dict) -> bool:
             if filters.get("user_id") and item.get("face_id") != filters["user_id"]:
                 return False
+            if filters.get("session_id") and item.get("session_id") != filters["session_id"]:
+                return False
+            if filters.get("course_name") and item.get("course_name") != filters["course_name"]:
+                return False
             if filters.get("start_date") and item.get("timestamp", "") < filters["start_date"]:
                 return False
             if filters.get("end_date") and item.get("timestamp", "") > filters["end_date"]:
@@ -72,6 +76,9 @@ class AttendanceLogger:
                 "user_id": item.get("face_id"),
                 "source": item.get("source"),
                 "session_id": item.get("session_id"),
+                "course_name": item.get("course_name"),
+                "session_start": item.get("session_start"),
+                "session_end": item.get("session_end"),
             }
             for item in items
             if _match(item)
