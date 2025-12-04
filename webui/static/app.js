@@ -295,6 +295,7 @@ if (downloadBtn) {
     console.log("📡 Fetching:", url);
     
     try {
+      setStatus("Downloading attendance...", "warning");
       const response = await fetch(url);
       console.log("📥 Response status:", response.status, response.statusText);
       
@@ -317,11 +318,11 @@ if (downloadBtn) {
       console.log("✅ CSV download triggered!");
       
       setStatus("✓ Attendance downloaded", "success");
-      setTimeout(() => setStatus("Ready", "neutral"), 2000);
+      setTimeout(() => setStatus("Camera ready — please center yourself", "success"), 2000);
     } catch (err) {
       console.error("❌ Download failed:", err);
-      setStatus("✗ Download failed - check console", "warning");
-      setTimeout(() => setStatus("Ready", "neutral"), 3000);
+      setStatus("✗ Download failed: " + err.message, "warning");
+      setTimeout(() => setStatus("Camera ready — please center yourself", "success"), 3000);
     }
   });
 } else {
