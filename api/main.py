@@ -78,6 +78,8 @@ async def recognize_face(image: UploadFile = File(...)):
     try:
         results = system.recognize_frame(rgb_frame)
     except Exception as exc:
+        import traceback
+        traceback.print_exc()  # Print full error to terminal
         raise HTTPException(status_code=500, detail=str(exc))
 
     recognized = any(face["user_id"] != "Unknown" for face in results)
@@ -102,6 +104,8 @@ async def enroll(name: str = Form(...), image: UploadFile = File(...)):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
+        import traceback
+        traceback.print_exc()  # Print full error to terminal
         raise HTTPException(status_code=500, detail=str(exc))
 
     return {"status": "ok", "message": f"Enrolled {clean_name}"}
