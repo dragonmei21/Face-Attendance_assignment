@@ -40,6 +40,8 @@ async def register_face(
     try:
         system.build_database()
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # Print full error to terminal
         image_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Failed to rebuild embeddings: {e}")
 

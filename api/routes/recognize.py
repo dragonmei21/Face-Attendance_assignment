@@ -35,6 +35,8 @@ async def recognize(image: UploadFile = File(...)) -> RecognizeResponse:
             detail="Embedding database not found. Register at least one user first.",
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # Print full error to terminal
         tmp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Recognition failed: {e}")
 
