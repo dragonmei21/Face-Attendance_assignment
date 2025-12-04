@@ -10,7 +10,7 @@ const captureCanvas = document.createElement("canvas");
 const captureCtx = captureCanvas.getContext("2d");
 const overlayCtx = overlay.getContext("2d");
 
-const BLUR_THRESHOLD = 250;
+const BLUR_THRESHOLD = 150;  // Lowered from 250 for better lighting compatibility
 const HOLD_STILL_SECONDS = 3;
 
 let latestSnapshotBlob = null;
