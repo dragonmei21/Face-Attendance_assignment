@@ -286,34 +286,47 @@ async function logCloudComputingAttendance(userId) {
 }
 
 // Download button handler
-downloadBtn.addEventListener("click", async () => {
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
-  const url = `/download/cloud-computing?session_date=${today}`;
-  
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to download: ${response.statusText}`);
+if (downloadBtn) {
+  console.log("✓ Download button found and wired up");
+  downloadBtn.addEventListener("click", async () => {
+    console.log("🔽 Download button clicked!");
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+    const url = `/download/cloud-computing?session_date=${today}`;
+    console.log("📡 Fetching:", url);
+    
+    try {
+      const response = await fetch(url);
+      console.log("📥 Response status:", response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Server error:", errorText);
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      console.log("📦 Blob size:", blob.size, "bytes");
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `CloudComputing_Attendance_${today}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      console.log("✅ CSV download triggered!");
+      
+      setStatus("✓ Attendance downloaded", "success");
+      setTimeout(() => setStatus("Ready", "neutral"), 2000);
+    } catch (err) {
+      console.error("❌ Download failed:", err);
+      setStatus("✗ Download failed - check console", "warning");
+      setTimeout(() => setStatus("Ready", "neutral"), 3000);
     }
-    
-    const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = `CloudComputing_Attendance_${today}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(downloadUrl);
-    
-    setStatus("✓ Attendance downloaded", "success");
-    setTimeout(() => setStatus("Ready", "neutral"), 2000);
-  } catch (err) {
-    console.error("Download failed:", err);
-    setStatus("✗ Download failed", "warning");
-    setTimeout(() => setStatus("Ready", "neutral"), 2000);
-  }
-});
+  });
+} else {
+  console.error("❌ Download button not found! Check HTML id='downloadBtn'");
+}
 
 initCamera();
 
